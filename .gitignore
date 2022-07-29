@@ -1,0 +1,8 @@
+target
+export_syms
+*.o
+*.ko
+machine
+x86
+opt_global.h
+kernel-sys/src/bindings.rs

@@ -1,0 +1,13 @@
+[package]
+name = "bsd-kernel"
+version = "0.1.0"
+authors = ["David Young <david.young@nccgroup.com>"]
+edition = "2021"
+license = "BSD-2-Clause"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kernel-sys = { path = "../kernel-sys" }
+libc = "0.2"
+spin = "0.7"

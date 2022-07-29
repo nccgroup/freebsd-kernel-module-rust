@@ -1,0 +1,15 @@
+[workspace]
+members = [
+	"bsd-kernel",
+	"kernel-sys",
+	"module-hello",
+]
+default-members = [
+	"module-hello",
+]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
