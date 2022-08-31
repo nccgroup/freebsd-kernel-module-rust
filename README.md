@@ -5,7 +5,7 @@ This repo is mostly an updated version of https://github.com/johalun/echo
 It has been updated to Rust 2021 with new bindings to the kernel headers and
 tested with Rust version `1.64.0-nightly (b1dd22e66 2022-07-09)`
 
-For more information, see the [accompanying blog post](https://research.nccgroup.com/).
+For more information, see the [accompanying blog post](https://research.nccgroup.com/2022/08/31/writing-freebsd-kernel-modules-in-rust/).
 
 ### Setup
 * Install Rust via Rustup
