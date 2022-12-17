@@ -103,7 +103,7 @@ impl<'a, T: Sized> Deref for LockedModule<'a, T> {
 
 impl<'a, T: Sized> DerefMut for LockedModule<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
-        &mut *self.guard.as_mut().unwrap()
+        self.guard.as_mut().unwrap()
     }
 }
 
@@ -119,11 +119,16 @@ impl<'a, T> core::fmt::Debug for LockedModule<'a, T> {
     }
 }
 
+pub type InnerModule<T> = Mutex<Option<T>>;
+
 /// Wrapper to protect a module behind a mutex
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SharedModule<T> {
-    inner: Arc<Mutex<Option<T>>>,
+    inner: Arc<InnerModule<T>>,
 }
+
+pub type RawModule<T> = *const InnerModule<T>;
+
 impl<T> SharedModule<T> {
     pub fn new(data: T) -> Self {
         SharedModule {
@@ -135,19 +140,24 @@ impl<T> SharedModule<T> {
         self.inner.clone()
     }
 
-    pub fn lock(&self) -> Option<LockedModule<T>> {
-        let guard = self.inner.lock();
-        if guard.is_some() {
-            Some(LockedModule { guard })
-        } else {
-            None
+    pub fn into_raw(self) -> RawModule<T> {
+        Arc::into_raw(self.inner)
+    }
+
+    pub unsafe fn from_raw(this: RawModule<T>) -> Self {
+        SharedModule {
+            inner: Arc::from_raw(this),
+        }
+    }
+
+    pub fn lock(&self) -> LockedModule<T> {
+        LockedModule {
+            guard: self.inner.lock(),
         }
     }
 
     pub fn cleanup(&self) {
-        {
-            let _ = self.inner.lock().take();
-        }
+        core::mem::drop(self.inner.lock().take());
         // Safe to do this in kldunload callback?
         // If we don't, we'll leak 64 byte Mutex struct (maybe not a disaster...)
         unsafe {
@@ -158,20 +168,3 @@ impl<T> SharedModule<T> {
         }
     }
 }
-
-impl<T> Clone for SharedModule<T> {
-    fn clone(&self) -> Self {
-        SharedModule {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<T> Drop for SharedModule<T> {
-    fn drop(&mut self) {
-        // debugln!("[kernel.rs] SharedModule::drop");
-    }
-}
-
-unsafe impl<T> Sync for SharedModule<T> {}
-unsafe impl<T> Send for SharedModule<T> {}
