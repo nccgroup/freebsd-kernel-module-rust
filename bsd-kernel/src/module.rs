@@ -120,10 +120,11 @@ impl<'a, T> core::fmt::Debug for LockedModule<'a, T> {
 }
 
 /// Wrapper to protect a module behind a mutex
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SharedModule<T> {
     inner: Arc<Mutex<Option<T>>>,
 }
+
 impl<T> SharedModule<T> {
     pub fn new(data: T) -> Self {
         SharedModule {
@@ -136,12 +137,10 @@ impl<T> SharedModule<T> {
     }
 
     pub fn lock(&self) -> Option<LockedModule<T>> {
-        let guard = self.inner.lock();
-        if guard.is_some() {
-            Some(LockedModule { guard })
-        } else {
-            None
-        }
+        self.inner
+            .lock()
+            .ok()
+            .map(|guard| LockedModule { guard })
     }
 
     pub fn cleanup(&self) {
@@ -155,14 +154,6 @@ impl<T> SharedModule<T> {
                 as *const Arc<Mutex<Option<T>>>
                 as *mut Arc<Mutex<Option<T>>>;
             ptr::drop_in_place(ptr);
-        }
-    }
-}
-
-impl<T> Clone for SharedModule<T> {
-    fn clone(&self) -> Self {
-        SharedModule {
-            inner: self.inner.clone(),
         }
     }
 }

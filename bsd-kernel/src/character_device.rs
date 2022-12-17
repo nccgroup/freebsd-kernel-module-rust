@@ -111,15 +111,15 @@ where
             )
         };
 
-        match cdev_raw.is_null() {
-            true => {
+        match ptr::NonNull::new(cdev_raw) {
+            None => {
                 // Convert cdevsw back to Box so memory can be freed
                 let _cdevsw = unsafe { Box::from_raw(cdevsw_raw) };
                 None
             }
-            false => {
+            Some(cdev) => {
                 let cdev = Box::new(CDev {
-                    cdev: ptr::NonNull::new(cdev_raw).unwrap(),
+                    cdev,
                     delegate,
                 });
                 unsafe {
