@@ -82,7 +82,7 @@ impl ModuleEventType {
 /// TODO: functions for SHUTDOWN and QUIESCE with default implementations
 pub trait ModuleEvents {
     /// Function called when the module is loaded
-    fn load(&mut self);
+    fn load() -> Self;
     /// Function called when the module is unloaded
     fn unload(&mut self);
 }
@@ -130,10 +130,14 @@ pub struct SharedModule<T> {
 pub type RawModule<T> = *const InnerModule<T>;
 
 impl<T> SharedModule<T> {
-    pub fn new(data: T) -> Self {
+    pub fn new() -> Self {
         SharedModule {
-            inner: Arc::new(Mutex::new(Some(data))),
+            inner: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn replace(&mut self, data: T) -> Option<T> {
+        self.inner.lock().replace(data)
     }
 
     pub fn inner(&self) -> Arc<Mutex<Option<T>>> {

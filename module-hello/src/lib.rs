@@ -82,7 +82,9 @@ pub extern "C" fn module_event(
             Load => {
                 // debugln!("[interface.rs] MOD_LOAD");
 
-                MODULE.lock().load();
+                if let Some(x) = module::Hello::load() {
+                    MODULE.replace(x);
+                }
             }
             Unload => {
                 // debugln!("[interface.rs] MOD_UNLOAD");

@@ -35,32 +35,17 @@ use lazy_static::lazy_static;
 lazy_static! {
     // Object created on first access (which is module load callback)
     pub static ref MODULE:
-        SharedModule<Hello> = SharedModule::new(Hello::new());
+        SharedModule<Hello> = SharedModule::new();
 }
 
 #[derive(Debug)]
-pub struct HelloInner {
-    data: String,
-    _cdev: Box<CDev<Hello>>,
-}
-
-#[derive(Default, Debug)]
 pub struct Hello {
-    // Put everything in an option so that SharedModule<Hello> can be
-    // fully initialised before we start doing stuff in module load
-    // callback. (we can't for example clone MODULE while in
-    // Hello::new() because of order of initialisation)
-    inner: Option<HelloInner>,
-}
-impl Hello {
-    fn new() -> Self {
-        // We can't access MODULE here because it is not initialised yet!
-        Hello { inner: None }
-    }
+    data: String,
+    _cdev: CDev<Hello>,
 }
 
 impl ModuleEvents for Hello {
-    fn load(&mut self) {
+    fn load() -> Option<Self> {
         debugln!("[module.rs] Hello::load");
 
         // MODULE has been fully initialised here
@@ -68,14 +53,15 @@ impl ModuleEvents for Hello {
         let m = MODULE.clone();
 
         if let Some(cdev) = CDev::new_with_delegate("rustmodule", m) {
-            self.inner = Some(HelloInner {
+            Some(Hello {
                 data: "Default hello message\n".to_string(),
                 _cdev: cdev,
-            });
+            })
         } else {
             debugln!(
                 "[module.rs] Hello::load: Failed to create character device"
             );
+            None
         }
     }
 
@@ -93,33 +79,23 @@ impl CharacterDevice for Hello {
     }
     fn read(&mut self, uio: &mut UioWriter) {
         // debugln!("[module.rs] Hello::read");
-
-        if let Some(ref h) = self.inner {
-            match uio.write_all(&h.data.as_bytes()) {
-                Ok(()) => (),
-                Err(e) => debugln!("{}", e),
-            }
+        match uio.write_all(&self.data.as_bytes()) {
+            Ok(()) => (),
+            Err(e) => debugln!("{}", e),
         }
     }
     fn write(&mut self, uio: &mut UioReader) {
         // debugln!("[module.rs] Hello::write");
-        if let Some(ref mut inner) = self.inner {
-            inner.data.clear();
-            match uio.read_to_string(&mut inner.data) {
-                Ok(x) => {
-                    debugln!(
-                        "Read {} bytes. Setting new message to `{}`",
-                        x,
-                        inner.data
-                    )
-                }
-                Err(e) => debugln!("{:?}", e),
+        self.data.clear();
+        match uio.read_to_string(&mut self.data) {
+            Ok(x) => {
+                debugln!(
+                    "Read {} bytes. Setting new message to `{}`",
+                    x,
+                    inner.data
+                )
             }
+            Err(e) => debugln!("{:?}", e),
         }
-    }
-}
-impl Drop for Hello {
-    fn drop(&mut self) {
-        // debugln!("Hello::drop");
     }
 }
