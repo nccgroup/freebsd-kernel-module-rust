@@ -97,13 +97,13 @@ impl<'a, T: Sized> Deref for LockedModule<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        &self.guard
+        self.guard.as_ref().unwrap()
     }
 }
 
 impl<'a, T: Sized> DerefMut for LockedModule<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
-        &mut self.guard
+        self.guard.as_mut().unwrap()
     }
 }
 
