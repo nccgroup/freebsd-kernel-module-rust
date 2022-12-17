@@ -97,13 +97,13 @@ impl<'a, T: Sized> Deref for LockedModule<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        self.guard.as_ref().unwrap()
+        &self.guard
     }
 }
 
 impl<'a, T: Sized> DerefMut for LockedModule<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
-        &mut *self.guard.as_mut().unwrap()
+        &mut self.guard
     }
 }
 
@@ -136,17 +136,14 @@ impl<T> SharedModule<T> {
         self.inner.clone()
     }
 
-    pub fn lock(&self) -> Option<LockedModule<T>> {
-        self.inner
-            .lock()
-            .ok()
-            .map(|guard| LockedModule { guard })
+    pub fn lock(&self) -> LockedModule<T> {
+        LockedModule {
+            guard: self.inner.lock(),
+        }
     }
 
     pub fn cleanup(&self) {
-        {
-            let _ = self.inner.lock().take();
-        }
+        core::mem::drop(self.inner.lock());
         // Safe to do this in kldunload callback?
         // If we don't, we'll leak 64 byte Mutex struct (maybe not a disaster...)
         unsafe {

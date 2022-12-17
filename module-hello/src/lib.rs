@@ -82,17 +82,12 @@ pub extern "C" fn module_event(
             Load => {
                 // debugln!("[interface.rs] MOD_LOAD");
 
-                if let Some(mut m) = MODULE.lock() {
-                    m.load();
-                }
+                MODULE.lock().load();
             }
             Unload => {
                 // debugln!("[interface.rs] MOD_UNLOAD");
 
-                if let Some(mut m) = MODULE.lock() {
-                    m.unload();
-                }
-
+                MODULE.lock().unload();
                 MODULE.cleanup();
             }
             Quiesce => {

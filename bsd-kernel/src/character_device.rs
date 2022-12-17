@@ -118,10 +118,7 @@ where
                 None
             }
             Some(cdev) => {
-                let cdev = Box::new(CDev {
-                    cdev,
-                    delegate,
-                });
+                let cdev = Box::new(CDev { cdev, delegate });
                 unsafe {
                     (*cdev_raw).si_drv1 =
                         &*cdev as *const CDev<T> as *mut libc::c_void
@@ -172,9 +169,7 @@ where
 {
     // debugln!("cdev_open");
     let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    if let Some(mut m) = cdev.delegate.lock() {
-        m.open();
-    }
+    cdev.delegate.lock().open();
     0
 }
 
@@ -200,9 +195,7 @@ where
 {
     // debugln!("cdev_close");
     let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    if let Some(mut m) = cdev.delegate.lock() {
-        m.close();
-    }
+    cdev.delegate.lock().close();
     0
 }
 
@@ -216,9 +209,7 @@ where
 {
     // debugln!("cdev_read");
     let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    if let Some(mut m) = cdev.delegate.lock() {
-        m.read(&mut UioWriter::new(uio));
-    }
+    cdev.delegate.lock().read(&mut UioWriter::new(uio));
     0
 }
 
@@ -232,8 +223,8 @@ where
 {
     // debugln!("cdev_write");
     let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    if let Some(mut m) = cdev.delegate.lock() {
-        m.write(unsafe { &mut UioReader::new(uio) });
-    }
+    cdev.delegate
+        .lock()
+        .write(unsafe { &mut UioReader::new(uio) });
     0
 }
