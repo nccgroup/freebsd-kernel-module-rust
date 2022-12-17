@@ -96,7 +96,7 @@ where
             c.d_read = Some(cdev_read::<T>);
             c.d_write = Some(cdev_write::<T>);
             c.d_version = kernel_sys::D_VERSION as i32;
-            c.d_name = "helloworld".as_ptr() as *mut i8;
+            c.d_name = cstr_ref!(name).as_ptr() as *mut i8;
             Box::into_raw(Box::new(c))
         };
 
