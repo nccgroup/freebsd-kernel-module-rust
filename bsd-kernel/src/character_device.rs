@@ -24,7 +24,7 @@
 // Based on public domain code by Johannes Lundberg
 
 use crate::cstr_ref;
-use crate::module::SharedModule;
+use crate::module::{InnerModule, RawModule, SharedModule};
 use crate::uio::{UioReader, UioWriter};
 use alloc::boxed::Box;
 use core::prelude::v1::*;
@@ -73,13 +73,8 @@ pub trait CharacterDevice {
     fn write(&mut self, uio: &mut UioReader);
 }
 
-pub struct CDev<T>
-where
-    T: CharacterDevice,
-{
-    cdev: ptr::NonNull<kernel_sys::cdev>,
-    delegate: SharedModule<T>,
-}
+#[derive(Debug)]
+pub struct CDev<T>(ptr::NonNull<kernel_sys::cdev>);
 
 impl<T> CDev<T>
 where
@@ -88,7 +83,7 @@ where
     pub fn new_with_delegate(
         name: &'static str,
         delegate: SharedModule<T>,
-    ) -> Option<Box<Self>> {
+    ) -> Option<Self> {
         let cdevsw_raw: *mut kernel_sys::cdevsw = {
             let mut c: kernel_sys::cdevsw = unsafe { mem::zeroed() };
             c.d_open = Some(cdev_open::<T>);
@@ -118,23 +113,13 @@ where
                 None
             }
             Some(cdev) => {
-                let cdev = Box::new(CDev { cdev, delegate });
                 unsafe {
                     (*cdev_raw).si_drv1 =
-                        &*cdev as *const CDev<T> as *mut libc::c_void
+                        delegate.into_raw() as *mut libc::c_void;
                 };
-                Some(cdev)
+                Some(CDev(cdev))
             }
         }
-    }
-}
-
-impl<T> fmt::Debug for CDev<T>
-where
-    T: CharacterDevice,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CDev {{ cdev: {:?}, ... }}", self.cdev.as_ptr())
     }
 }
 
@@ -146,15 +131,27 @@ where
         // debugln!("[kernel.rs] CDev::drop");
 
         // Assign only to clarify what type we're dealing with...
-        let dev: *mut kernel_sys::cdev = self.cdev.as_ptr();
+        let dev: *mut kernel_sys::cdev = self.0.as_ptr();
 
         // Back to Box so cdevsw memory is freed
         let _cdevsw: Box<kernel_sys::cdevsw> =
             unsafe { Box::from_raw((*dev).si_devsw) };
 
+        // destroy delegate reference
+        let _shmod =
+            unsafe { SharedModule::from_raw((*dev).si_drv1 as RawModule<T>) };
+
         // debugln!("[kernel.rs] CDev::drop calling destroy_dev. ptr={:?}", dev.as_ptr());
         unsafe { kernel_sys::destroy_dev(dev) };
     }
+}
+
+unsafe fn unwrap_delegate<T: CharacterDevice>(
+    dev: *mut kernel_sys::cdev,
+) -> &T {
+    let delegate: &InnerModule<T> =
+        unsafe { &*((*dev).si_drv1 as RawModule<T>) };
+    delegate.lock().as_mut().unwrap()
 }
 
 // File operations callbacks
@@ -168,8 +165,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_open");
-    let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    cdev.delegate.lock().open();
+    unsafe { unwrap_delegate::<T>(dev) }.open();
     0
 }
 
@@ -194,8 +190,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_close");
-    let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    cdev.delegate.lock().close();
+    unsafe { unwrap_delegate::<T>(dev) }.close();
     0
 }
 
@@ -208,8 +203,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_read");
-    let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    cdev.delegate.lock().read(&mut UioWriter::new(uio));
+    unsafe { unwrap_delegate::<T>(dev) }.read(&mut UioWriter::new(uio));
     0
 }
 
@@ -222,9 +216,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_write");
-    let cdev: &CDev<T> = unsafe { &*((*dev).si_drv1 as *const CDev<T>) };
-    cdev.delegate
-        .lock()
+    unsafe { unwrap_delegate::<T>(dev) }
         .write(unsafe { &mut UioReader::new(uio) });
     0
 }

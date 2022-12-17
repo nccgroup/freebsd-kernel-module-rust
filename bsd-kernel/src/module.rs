@@ -119,11 +119,15 @@ impl<'a, T> core::fmt::Debug for LockedModule<'a, T> {
     }
 }
 
+pub type InnerModule<T> = Mutex<Option<T>>;
+
 /// Wrapper to protect a module behind a mutex
 #[derive(Clone, Debug, Default)]
 pub struct SharedModule<T> {
-    inner: Arc<Mutex<Option<T>>>,
+    inner: Arc<InnerModule<T>>,
 }
+
+pub type RawModule<T> = *const InnerModule<T>;
 
 impl<T> SharedModule<T> {
     pub fn new(data: T) -> Self {
@@ -136,6 +140,16 @@ impl<T> SharedModule<T> {
         self.inner.clone()
     }
 
+    pub fn into_raw(self) -> RawModule<T> {
+        Arc::into_raw(self.inner)
+    }
+
+    pub unsafe fn from_raw(this: RawModule<T>) -> Self {
+        SharedModule {
+            inner: Arc::from_raw(this),
+        }
+    }
+
     pub fn lock(&self) -> LockedModule<T> {
         LockedModule {
             guard: self.inner.lock(),
@@ -143,7 +157,7 @@ impl<T> SharedModule<T> {
     }
 
     pub fn cleanup(&self) {
-        core::mem::drop(self.inner.lock());
+        core::mem::drop(self.inner.lock().take());
         // Safe to do this in kldunload callback?
         // If we don't, we'll leak 64 byte Mutex struct (maybe not a disaster...)
         unsafe {
@@ -154,12 +168,3 @@ impl<T> SharedModule<T> {
         }
     }
 }
-
-impl<T> Drop for SharedModule<T> {
-    fn drop(&mut self) {
-        // debugln!("[kernel.rs] SharedModule::drop");
-    }
-}
-
-unsafe impl<T> Sync for SharedModule<T> {}
-unsafe impl<T> Send for SharedModule<T> {}
