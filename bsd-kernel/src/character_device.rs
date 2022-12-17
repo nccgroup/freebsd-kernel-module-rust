@@ -146,12 +146,14 @@ where
     }
 }
 
-unsafe fn unwrap_delegate<T: CharacterDevice>(
-    dev: *mut kernel_sys::cdev,
-) -> &T {
+unsafe fn on_delegate<T, F, R>(dev: *mut kernel_sys::cdev, f: F) -> Option<R>
+where
+    T: CharacterDevice,
+    F: FnOnce(&mut T) -> R,
+{
     let delegate: &InnerModule<T> =
         unsafe { &*((*dev).si_drv1 as RawModule<T>) };
-    delegate.lock().as_mut().unwrap()
+    delegate.lock().as_mut().map(f)
 }
 
 // File operations callbacks
@@ -165,7 +167,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_open");
-    unsafe { unwrap_delegate::<T>(dev) }.open();
+    unsafe { on_delegate::<T>(dev, |d| d.open()) };
     0
 }
 
@@ -190,7 +192,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_close");
-    unsafe { unwrap_delegate::<T>(dev) }.close();
+    unsafe { on_delegate::<T>(dev, |d| d.close()) };
     0
 }
 
@@ -203,7 +205,7 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_read");
-    unsafe { unwrap_delegate::<T>(dev) }.read(&mut UioWriter::new(uio));
+    unsafe { on_delegate::<T>(dev, |d| d.read(&mut UioWriter::new(uio))) };
     0
 }
 
@@ -216,7 +218,8 @@ where
     T: CharacterDevice,
 {
     // debugln!("cdev_write");
-    unsafe { unwrap_delegate::<T>(dev) }
-        .write(unsafe { &mut UioReader::new(uio) });
+    unsafe {
+        on_delegate::<T>(dev, |d| d.write(unsafe { &mut UioReader::new(uio) }))
+    };
     0
 }
