@@ -31,6 +31,10 @@ use std::path::PathBuf;
 const FILEPATH: &str = "src/bindings.rs";
 
 fn main() {
+    let src_base = match std::env::var("SRC_BASE") {
+        Ok(s) => format!("-I{s}/sys"),
+        _ => "-I/usr/src/sys".to_string()
+    };
     let bindings = Builder::default()
         .rustfmt_bindings(true)
         .use_core()
@@ -46,7 +50,7 @@ fn main() {
         .clang_arg("-DKLD_MODULE")
         .clang_arg("-nostdinc")
         .clang_arg("-I.")
-        .clang_arg("-I/usr/src/sys")
+        .clang_arg(src_base)
         .clang_arg("-I/usr/include")
         .clang_arg("-fno-common")
         .clang_arg("-fno-omit-frame-pointer")
